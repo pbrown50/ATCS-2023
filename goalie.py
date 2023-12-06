@@ -1,11 +1,12 @@
 import random
 import bot
 import pygame
-import game
+
 class Goalie:
-    def __init__(self, x, y):
+    def __init__(self, game, x, y):
         self.x = x
         self.y = y
+        self.game = game
         self.movement_speed = 2
         self.movement_direction = random.choice([-1, 1])
         self.state_machine = bot.FSMGoalie()
@@ -35,15 +36,15 @@ class Goalie:
         self.y += self.movement_speed * self.movement_direction
 
         # Reverse direction if reaching the vertical boundaries
-        if self.y <= game.HEIGHT // 2 - game.GOALIE_RANGE or self.y >= game.HEIGHT // 2 + game.GOALIE_RANGE:
+        if self.y <= self.game.HEIGHT // 2 - self.game.GOALIE_RANGE or self.y >= self.game.HEIGHT // 2 + game.GOALIE_RANGE:
             self.movement_direction *= -1
 
     def block_goal(self, ball_pos):
         # Move towards the ball on the linear plane of the goal width
         if ball_pos[1] < self.y:
-            self.y -= min(self.movement_speed, self.y - (game.HEIGHT // 2 - game.GOALIE_RANGE))
+            self.y -= min(self.movement_speed, self.y - (self.game.HEIGHT // 2 - self.game.GOALIE_RANGE))
         elif ball_pos[1] > self.y:
-            self.y += min(self.movement_speed, (game.HEIGHT // 2 + game.GOALIE_RANGE) - self.y)
+            self.y += min(self.movement_speed, (self.game.HEIGHT // 2 + self.game.GOALIE_RANGE) - self.y)
 
     def celebrate(self):
         # Rapidly change colors for the celebration duration
@@ -56,8 +57,8 @@ class Goalie:
         r = (self.celebration_timer * color_change_rate) % 255
         g = (self.celebration_timer * color_change_rate * 1.5) % 255
         b = (self.celebration_timer * color_change_rate * 2) % 255
-        pygame.draw.rect(game.screen, (r, g, b), (self.x, self.y, game.PLAYER_SIZE, game.PLAYER_SIZE))
+        pygame.draw.rect(self.game.screen, (r, g, b), (self.x, self.y, self.game.PLAYER_SIZE, self.game.PLAYER_SIZE))
 
     def draw(self, screen):
         # Draw the goalie
-        pygame.draw.rect(screen, game.WHITE, (self.x, self.y, game.PLAYER_SIZE, game.PLAYER_SIZE))
+        pygame.draw.rect(screen, self.game.WHITE, (self.x, self.y, self.game.PLAYER_SIZE, self.game.PLAYER_SIZE))

@@ -1,6 +1,7 @@
 import random
 import bot
 import pygame
+from fsm import FSM
 
 class Goalie:
     def __init__(self, game, x, y):
@@ -9,22 +10,30 @@ class Goalie:
         self.game = game
         self.movement_speed = 2
         self.movement_direction = random.choice([-1, 1])
-        self.state_machine = bot.FSMGoalie()
         self.score = 0
 
         # Variables for celebrating state
         self.celebration_timer = 0
         self.celebration_duration = 3  # in seconds
 
+        self.fsm = FSM("S")
+        self.init_fsm()
+
+    def init_fsm(self):
+        self.fsm.add_transition("BallShot", "IDLE", action=self.block_goal)
+        self.fsm.add_transition("GoalScored", "BLOCKING", action=self.celebrate)
+        self.fsm.add_transition("CelebrationComplete", "CELEBRATING", action=self.move_back_and_forth)
+        pass
+
     def update(self, ball_pos):
-        self.move_randomly()
+        self.move_back_and_forth()
 
         # Perform actions based on the goalie's current state
-        if self.state_machine.fsm.current_state == "BLOCKING":
+        if self.fsm.current_state == "BLOCKING":
             self.block_goal(ball_pos)
-        elif self.state_machine.fsm.current_state == "CELEBRATING":
+        elif self.fsm.current_state == "CELEBRATING":
             self.celebrate()
-        elif self.state_machine.fsm.current_state == "IDLE":
+        elif self.fsm.current_state == "IDLE":
             self.move_back_and_forth()
 
         # Update the celebration timer
@@ -36,14 +45,14 @@ class Goalie:
         self.y += self.movement_speed * self.movement_direction
 
         # Reverse direction if reaching the vertical boundaries
-        if self.y <= self.game.HEIGHT // 2 - self.game.GOALIE_RANGE or self.y >= self.game.HEIGHT // 2 + game.GOALIE_RANGE:
+        if self.y <= self.game.HEIGHT // 2 - self.game.GOALIE_RANGE or self.y >= self.game.HEIGHT // 2 + self.game.GOALIE_RANGE:
             self.movement_direction *= -1
 
     def block_goal(self, ball_pos):
         # Move towards the ball on the linear plane of the goal width
         if ball_pos[1] < self.y:
             self.y -= min(self.movement_speed, self.y - (self.game.HEIGHT // 2 - self.game.GOALIE_RANGE))
-        elif ball_pos[1] > self.y:
+        else:
             self.y += min(self.movement_speed, (self.game.HEIGHT // 2 + self.game.GOALIE_RANGE) - self.y)
 
     def celebrate(self):

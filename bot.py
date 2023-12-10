@@ -2,7 +2,7 @@ import pygame
 import goalie
 from fsm import FSM
 
-class Goalie():
+class Goalie:
 
     def __init__(self, game, x=50, y=50):
         super().__init__()

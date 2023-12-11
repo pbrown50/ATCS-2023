@@ -48,9 +48,12 @@ class Game:
 
         # Set up clock
         self.clock = pygame.time.Clock()
+        self.dt = 0
 
         # Initialize shooting attribute
         self.shooting = False
+
+        self.input = None
 
     def draw_ball(self):
         pygame.draw.circle(self.screen, self.WHITE, (int(self.ball_pos[0]), int(self.ball_pos[1])), self.ball_radius)
@@ -75,6 +78,8 @@ class Game:
                                     (self.HEIGHT - instruction_height) // 2 + i * text.get_height()))
 
     def shoot(self, destination_x, destination_y):
+        self.input = "BallShot"
+
         # Calculate the angle between the ball and the destination
         angle = math.atan2(destination_y - self.ball_pos[1], destination_x - self.ball_pos[0])
 
@@ -88,19 +93,8 @@ class Game:
         # Check if the ball has reached the destination
         if math.dist((self.ball_pos[0], self.ball_pos[1]), (destination_x, destination_y)) < shooting_speed:
             self.shooting = False
-
-            # # Check for goal and goalie contact
-            # if (pygame.Rect(self.goalie.x, self.goalie.y, self.PLAYER_SIZE, self.PLAYER_SIZE).colliderect(
-            #         pygame.Rect(self.ball_pos[0], self.ball_pos[1],
-            #             self.ball_radius * 2, self.ball_radius * 2))):
-            #     print("Goalie made contact with the ball!")
-            #     self.goalie.score += 1
-            # elif self.ball_pos[0] > (self.HEIGHT - self.GOAL_WIDTH) / 2 and self.ball_pos[0] <  ((self.HEIGHT - self.GOAL_WIDTH) / 2) + self.GOAL_WIDTH and self.ball_pos[1] > self.WIDTH - self.GOAL_WIDTH:
-            #     print("Goal scored!")
-            #     self.player.score += 1
-
-            # Reset ball position
             self.ball_pos = [0, 0]
+            self.input = "CelebrationComplete"
 
     def run_game(self):
         # Game loop
@@ -122,11 +116,11 @@ class Game:
             # Update the display
             pygame.display.flip()
 
-        # Reset the clock for the game loop
-        self.clock.tick()
-
         # Main game loop
         while True:
+            # Reset the clock for the game loop
+            self.dt += self.clock.tick(60)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -135,6 +129,7 @@ class Game:
                     self.shooting = True
                     self.ball_pos = (self.player.x + self.PLAYER_SIZE // 2, self.player.y + self.PLAYER_SIZE // 2)
                     self.destination_x, self.destination_y = pygame.mouse.get_pos()
+                    self.input = "BallShot"
 
             # Handle player movement
             keys = pygame.key.get_pressed()
@@ -154,9 +149,6 @@ class Game:
                 self.player.x = new_x
                 self.player.y = new_y
 
-            # Update goalie
-            self.goalie.update(self.ball_pos)
-
             # Check for goalie contact
             if pygame.Rect(self.goalie.x, self.goalie.y, self.PLAYER_SIZE, self.PLAYER_SIZE).colliderect(
                 pygame.Rect(
@@ -166,23 +158,31 @@ class Game:
                     self.ball_radius * 2,
                 )
             ):
-                print("Goalie made contact with the ball!")
+                print("Goalie save!")
                 self.goalie.score += 1
                 # Reset ball position
                 self.ball_pos = [0, 0]
                 self.shooting = False
-
+                self.input = "BallSaved"
+                self.dt = 0
+        
             # Check if the ball is inside the goal
-            elif (
-                self.ball_pos[1] > self.HEIGHT // 2 - self.GOAL_WIDTH // 2
-                and self.ball_pos[1] < self.HEIGHT // 2 + self.GOAL_WIDTH // 2
-                and self.ball_pos[0] > self.WIDTH - self.GOAL_WIDTH
-            ):
+            elif ( self.ball_pos[1] > self.HEIGHT // 2 - self.GOAL_WIDTH // 2 and
+                self.ball_pos[1] < self.HEIGHT // 2 + self.GOAL_WIDTH // 2 and
+                self.ball_pos[0] > self.WIDTH - self.GOAL_WIDTH and 
+                self.player.x <= self.WIDTH - self.GOAL_WIDTH):
                 print("Goal scored!")
                 self.player.score += 1
                 # Reset ball position
                 self.ball_pos = [0, 0]
                 self.shooting = False
+                self.input = "GoalScored"
+
+            if self.dt > 5000:
+                self.input = "DoneCelebrating"
+            # Update goalie
+            self.goalie.update(self.input)
+            
             # Clear the screen
             self.screen.fill(self.GREEN)
 

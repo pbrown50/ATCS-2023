@@ -1,4 +1,3 @@
-
 import pygame
 import sys
 import math
@@ -10,7 +9,7 @@ class Game:
     WIDTH, HEIGHT = 800, 400
     PLAYER_SIZE = 20
     GOAL_WIDTH = 100
-    GOALIE_RANGE = 50  # Vertical range for goalie movement
+    GOALIE_RANGE = 50  
 
     WHITE = (255, 255, 255)
     GREEN = (0, 128, 0)
@@ -36,8 +35,8 @@ class Game:
 
         # Goal triangle vertices
         self.goal_vertices = [(self.WIDTH - self.GOAL_WIDTH, self.HEIGHT // 2 - self.GOAL_WIDTH // 2),
-                              (self.WIDTH - self.GOAL_WIDTH, self.HEIGHT // 2 + self.GOAL_WIDTH // 2),
-                              (self.WIDTH, self.HEIGHT // 2)]
+                            (self.WIDTH - self.GOAL_WIDTH, self.HEIGHT // 2 + self.GOAL_WIDTH // 2),
+                            (self.WIDTH, self.HEIGHT // 2)]
 
         # Crease circle
         self.crease_center = (self.WIDTH - self.GOAL_WIDTH // 2, self.HEIGHT // 2)
@@ -53,12 +52,17 @@ class Game:
         # Initialize shooting attribute
         self.shooting = False
 
+        # Initialize shooting speed
+        self.shooting_speed = 5
+
+        # Input for Goalie FSM
         self.input = None
 
-    def draw_ball(self):
-        pygame.draw.circle(self.screen, self.WHITE, (int(self.ball_pos[0]), int(self.ball_pos[1])), self.ball_radius)
+        # Sounds files
+        self.goal_scored_sound = pygame.mixer.Sound('ATCS-2023/Sounds/Goal_Scored.wav')
+        self.goalie_save_sound = pygame.mixer.Sound('ATCS-2023/Sounds/Goal_Saved.wav')
 
-    # Display instructions
+    # Displays instructions
     def print_instructions(self):
         instructions = [
             "Welcome to Lacrosse Game!",
@@ -72,32 +76,55 @@ class Game:
             "Press the SPACE BAR to start the game."]
         instruction_texts = [self.font.render(line, True, self.WHITE) for line in instructions]
         instruction_height = sum([text.get_height() for text in instruction_texts])
-        # Draw instructions
         for i, text in enumerate(instruction_texts):
             self.screen.blit(text, ((self.WIDTH - text.get_width()) // 2,
                                     (self.HEIGHT - instruction_height) // 2 + i * text.get_height()))
 
+    # Player Shoots Ball Method
     def shoot(self, destination_x, destination_y):
+        # Updates input for Goalie FSM
         self.input = "BallShot"
 
         # Calculate the angle between the ball and the destination
         angle = math.atan2(destination_y - self.ball_pos[1], destination_x - self.ball_pos[0])
 
-        # Set the shooting speed
-        shooting_speed = 5
-
         # Update the ball's position towards the destination
-        self.ball_pos = (self.ball_pos[0] + shooting_speed * math.cos(angle),
-                         self.ball_pos[1] + shooting_speed * math.sin(angle))
+        self.ball_pos = (self.ball_pos[0] + self.shooting_speed * math.cos(angle),
+                         self.ball_pos[1] + self.shooting_speed * math.sin(angle))
 
-        # Check if the ball has reached the destination
-        if math.dist((self.ball_pos[0], self.ball_pos[1]), (destination_x, destination_y)) < shooting_speed:
+        # Checks if the ball has reached the destination
+        if math.dist((self.ball_pos[0], self.ball_pos[1]), (destination_x, destination_y)) < self.shooting_speed:
             self.shooting = False
             self.ball_pos = [0, 0]
-            self.input = "CelebrationComplete"
+            self.input = "ShotComplete"
 
+    # Draws lacrosse ball
+    def draw_ball(self):
+        pygame.draw.circle(self.screen, self.WHITE, (int(self.ball_pos[0]), int(self.ball_pos[1])), self.ball_radius)
+
+    # Checks if the player is inside the lacrosse crease
+    def is_inside_crease(self, x, y):
+        crease_center_x, crease_center_y = self.crease_center
+        crease_radius = self.crease_radius
+        distance_to_center = math.sqrt((x - crease_center_x) ** 2 + (y - crease_center_y) ** 2)
+        return distance_to_center <= crease_radius
+    
+    def draw_field(self):
+        # Draws the lacrosse field lines
+        pygame.draw.rect(self.screen, self.WHITE, (0, 0, self.WIDTH, self.HEIGHT), 2)
+        pygame.draw.line(self.screen, self.WHITE, (self.WIDTH // 2, 0), (self.WIDTH // 2, self.HEIGHT), 2)
+
+        # Draws the goal triangle
+        pygame.draw.polygon(self.screen, self.RED, self.goal_vertices)
+
+        # Draws the crease circle
+        pygame.draw.circle(self.screen, self.WHITE, (int(self.crease_center[0]), int(self.crease_center[1])),
+                        self.crease_radius, 2)
+
+
+    # Runs game
     def run_game(self):
-        # Game loop
+        # Waits for player to press the space bar before initiating game
         game_running = False
         while not game_running:
             for event in pygame.event.get():
@@ -107,34 +134,35 @@ class Game:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     game_running = True
 
-            # Clear the screen
+            # Clears the screen
             self.screen.fill(self.GREEN)
 
-            # Draw instructions
+            # Draws the instructions
             self.print_instructions()
 
-            # Update the display
+            # Updates the display
             pygame.display.flip()
 
         # Main game loop
         while True:
-            # Reset the clock for the game loop
+            # Resets the clock for the game loop
             self.dt += self.clock.tick(60)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+                # Shoots the ball if the player clicks the mouse
                 elif event.type == pygame.MOUSEBUTTONDOWN and not self.shooting:
                     self.shooting = True
                     self.ball_pos = (self.player.x + self.PLAYER_SIZE // 2, self.player.y + self.PLAYER_SIZE // 2)
                     self.destination_x, self.destination_y = pygame.mouse.get_pos()
+                    # Updates input for the goalie
                     self.input = "BallShot"
 
-            # Handle player movement
+            # Handles player movement
             keys = pygame.key.get_pressed()
             new_x, new_y = self.player.x, self.player.y
-
             if keys[pygame.K_LEFT] and self.player.x > 0:
                 new_x -= self.player.speed
             if keys[pygame.K_RIGHT] and self.player.x < self.WIDTH - self.PLAYER_SIZE:
@@ -149,7 +177,7 @@ class Game:
                 self.player.x = new_x
                 self.player.y = new_y
 
-            # Check for goalie contact
+            # Checks for goalie contact with the ball
             if pygame.Rect(self.goalie.x, self.goalie.y, self.PLAYER_SIZE, self.PLAYER_SIZE).colliderect(
                 pygame.Rect(
                     self.ball_pos[0] - self.ball_radius,
@@ -159,12 +187,16 @@ class Game:
                 )
             ):
                 print("Goalie save!")
+                # Increments score
                 self.goalie.score += 1
-                # Reset ball position
+                # Resets ball position
                 self.ball_pos = [0, 0]
                 self.shooting = False
+                # Updates input for the goalie
                 self.input = "BallSaved"
                 self.dt = 0
+                # Plays goal saved sound
+                self.goalie_save_sound.play()
         
             # Check if the ball is inside the goal
             elif ( self.ball_pos[1] > self.HEIGHT // 2 - self.GOAL_WIDTH // 2 and
@@ -172,62 +204,52 @@ class Game:
                 self.ball_pos[0] > self.WIDTH - self.GOAL_WIDTH and 
                 self.player.x <= self.WIDTH - self.GOAL_WIDTH):
                 print("Goal scored!")
+                # Increments pscore
                 self.player.score += 1
-                # Reset ball position
+                # Resets ball position
                 self.ball_pos = [0, 0]
                 self.shooting = False
+                # Updates input for the goalie
                 self.input = "GoalScored"
+                # Plays goal scored sound
+                self.goal_scored_sound.play()
 
             if self.dt > 5000:
+                # Updates input for the goalie after the celebration timer is complete
                 self.input = "DoneCelebrating"
-            # Update goalie
+
+            # Sends new input to the goalie FSM
             self.goalie.update(self.input)
             
-            # Clear the screen
+            # Clears the screen
             self.screen.fill(self.GREEN)
 
-            # Draw the lacrosse field lines
-            pygame.draw.rect(self.screen, self.WHITE, (0, 0, self.WIDTH, self.HEIGHT), 2)
-            pygame.draw.line(self.screen, self.WHITE, (self.WIDTH // 2, 0), (self.WIDTH // 2, self.HEIGHT), 2)
+            # Draws the field
+            self.draw_field()
 
-            # Draw the goal triangle
-            pygame.draw.polygon(self.screen, self.RED, self.goal_vertices)
-
-            # Draw the crease circle
-            pygame.draw.circle(self.screen, self.WHITE, (int(self.crease_center[0]), int(self.crease_center[1])),
-                            self.crease_radius, 2)
-
-            # Draw the player
+            # Draws the player
             self.player.draw(self.screen)
 
-            # Draw the goalie
+            # Draws the goalie
             self.goalie.draw(self.screen)
 
-            # Draw the ball if shooting
+            # Animates the ball moving if shooting
             if self.shooting:
                 self.shoot(self.destination_x, self.destination_y)
                 self.draw_ball()  # Draw the ball during the shooting
 
-            # Display scores
+            # Displays scores
             player_text = self.font.render(f"Player: {self.player.score}", True, self.WHITE)
             goalie_text = self.font.render(f"Goalie: {self.goalie.score}", True, self.WHITE)
             self.screen.blit(player_text, (10, 10))
             self.screen.blit(goalie_text, (10, 40))
 
-            # Update the display
+            # Updates the display
             pygame.display.flip()
 
-            # Cap the frame rate
+            # Caps the frame rate
             self.clock.tick(60)
-
-    def is_inside_crease(self, x, y):
-        # Check if the point (x, y) is inside the crease circle
-        crease_center_x, crease_center_y = self.crease_center
-        crease_radius = self.crease_radius
-        distance_to_center = math.sqrt((x - crease_center_x) ** 2 + (y - crease_center_y) ** 2)
-        return distance_to_center <= crease_radius
-
-
+# Runs the game
 if __name__ == "__main__":
     g = Game()
     g.run_game()
